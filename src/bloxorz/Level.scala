@@ -1,5 +1,7 @@
 package bloxorz
 
+import bloxorz.Menu
+
 case class Level(fields : List[List[Field]]) {
 
   def updateBoardState(d : Direction) : Level = {
@@ -77,6 +79,14 @@ case class Level(fields : List[List[Field]]) {
 
     updateBoardFields(toUpdate, newBlockPosList.length)
   }
+
+  def getFieldAtCoordinate(coord : (Int,Int)) : Field = {
+    val (x,y) = coord
+    fields(x)(y)
+  }
+
+  def getStartingPosition: Field = fields.flatten.find(_ == StartingPos(1)).get
+  def getEndPosition: Field = fields.flatten.find(_ == EndPos(0)).get
 
   def transformBoardAtField(toUpdate : Field, f : Field => Field): Level ={
     Level(fields.map(rows => rows.map(field =>
@@ -220,4 +230,63 @@ object LevelEditor {
 
     Level(padRows(padColumns(fields)))
   }
+
+  def edit(level : Level) : Option[Level] = {
+    def readCoordinate() : (Int,Int) = {
+      try{
+        val x = scala.io.StdIn.readInt()
+        val y = scala.io.StdIn.readInt()
+        (x,y)
+      } catch {
+        case _ : NumberFormatException => println("Incorrect input. Must be a number."); (-1,-1)
+      }
+    }
+
+    def convertTileToWeakTile(f : Field) : Field = {
+      if(f == Tile(0)) WeakTile(0)
+      else f
+    }
+
+    def convertWeakTileToTile(f : Field) : Field = {
+      if(f == WeakTile(0)) Tile(0)
+      else f
+    }
+
+    def setStartingPosition(level: Level, field: Field) : Level = {
+      if(field != NoTile(0)) {
+        level.transformBoardAtField(level.getStartingPosition, _ => Tile(0)).transformBoardAtField(field, _ => StartingPos(1))
+      } else throw new Error("Starting field must be on a tile")
+    }
+
+    def setEndPosition(level: Level, field: Field) : Level = {
+      if(field != NoTile(0)) {
+        level.transformBoardAtField(level.getEndPosition, _ => Tile(0)).transformBoardAtField(field, _ => EndPos(1))
+      } else throw new Error("End field must be on a tile")
+    }
+
+    var opt = 0
+    var newLevel : Level = level
+    do{
+      Menu.printEditMenu()
+      try {
+        opt = scala.io.StdIn.readInt()
+        opt match {
+          case 1 => newLevel = level.transformBoardAtField(level.getFieldAtCoordinate(readCoordinate()), _ => NoTile(0))
+          case 2 => newLevel = level.transformBoardAtField(level.getFieldAtCoordinate(readCoordinate()), _ => Tile(0))
+          case 3 => newLevel = level.transformBoardAtField(level.getFieldAtCoordinate(readCoordinate()), convertTileToWeakTile)
+          case 4 => newLevel = level.transformBoardAtField(level.getFieldAtCoordinate(readCoordinate()), convertWeakTileToTile)
+          case 5 => newLevel = setStartingPosition(level, level.getFieldAtCoordinate(readCoordinate()))
+          case 6 => newLevel = setEndPosition(level, level.getFieldAtCoordinate(readCoordinate()))
+        }
+      } catch {
+        case _ : NumberFormatException => println("Invalid menu choice.")
+        case _ : IndexOutOfBoundsException => println("Field at given coordinates does not exist")
+        case e : Error => println(e.toString)
+      }
+    } while (opt != 0)
+    if(newLevel == level){
+      None
+    } else Some(newLevel)
+  }
+
 }

@@ -4,6 +4,8 @@ import bloxorz.LevelEditor.readLevelFromFile
 import bloxorz.MoveReader.readMovesFromFile
 
 object Menu {
+
+
   def main(args: Array[String]): Unit = {
     var opt = 0
 
@@ -71,6 +73,11 @@ object Menu {
               val lvlChoice = scala.io.StdIn.readLine().toInt
               if(lvlChoice != 0)
                 Solver.solve(LevelCollection.chooseLevel(lvlChoice))
+            case 5 =>
+              LevelCollection.printLevelChooseMenu()
+              val lvlChoice = scala.io.StdIn.readLine().toInt
+              if(lvlChoice != 0)
+                LevelEditor.edit(LevelCollection.chooseLevel(lvlChoice))
 
 
             case 0 =>
@@ -88,6 +95,20 @@ object Menu {
 
     mainMenu()
 
+
+  }
+
+  def printEditMenu(): Unit ={
+    println("Edit level:")
+    println("")
+    println("1. Remove block at coordinate")
+    println("2. Add block at coordinate")
+    println("3. Replace plain tile with weak tile at coordinate")
+    println("4. Replace weak tile with plain tile at coordinate")
+    println("5. Set starting position at coordinate")
+    println("6. Set end position at coordinate")
+    println("")
+    println("Choice: ")
 
   }
 }
