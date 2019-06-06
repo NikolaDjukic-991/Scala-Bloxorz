@@ -1,7 +1,5 @@
 package bloxorz
 
-import bloxorz.Menu
-
 case class Level(fields : List[List[Field]]) {
 
   def updateBoardState(d : Direction) : Level = {
@@ -96,6 +94,14 @@ case class Level(fields : List[List[Field]]) {
     )))
   }
 
+  def transformBoardAtFields(toUpdate : List[Field], f : Field => Field): Level ={
+    Level(fields.map(rows => rows.map(field =>
+      if(toUpdate.exists(_ eq field))
+        f(field)
+      else field
+    )))
+  }
+
   def updateBoardFields(toUpdate : List[Field], newBlockOrientation : Int) : Level = {
     def invertField(f : Field) : Field = {
       if(f.hasBlock)
@@ -157,6 +163,16 @@ case class Level(fields : List[List[Field]]) {
 }
 
 object LevelEditor {
+  var compositeOperations : List[(String,List[Level=>Level])] = List(("Invert", List(invert)), ("Convert Special to normal", List(clearSpecialTiles)))
+
+  def invert(l : Level) : Level = {
+    Level(l.fields.map(rows => rows.map(f => if(f == StartingPos(1)) EndPos(0) else if (f == EndPos(0)) StartingPos(1) else f)))
+  }
+
+  def clearSpecialTiles(l : Level) : Level = {
+    Level(l.fields.map(rows => rows.map(f => if (f == WeakTile(0)) Tile(0) else f)))
+  }
+
   def convertToFields(lines: List[String]) : List[List[Field]] = {
     def createListOfFields(s : List[Char]) : List[Field] = {
       s match {
@@ -232,7 +248,10 @@ object LevelEditor {
   }
 
   def edit(level : Level) : Option[Level] = {
+    class CompositOperation
+
     def readCoordinate() : (Int,Int) = {
+      println("Input coordinate:")
       try{
         val x = scala.io.StdIn.readInt()
         val y = scala.io.StdIn.readInt()
@@ -260,23 +279,78 @@ object LevelEditor {
 
     def setEndPosition(level: Level, field: Field) : Level = {
       if(field != NoTile(0)) {
-        level.transformBoardAtField(level.getEndPosition, _ => Tile(0)).transformBoardAtField(field, _ => EndPos(1))
+        level.transformBoardAtField(level.getEndPosition, _ => Tile(0)).transformBoardAtField(field, _ => EndPos(0))
       } else throw new Error("End field must be on a tile")
+    }
+
+    def createCompositeOperation(ops : List[Level=>Level]) : (String, List[Level=>Level]) = {
+      Menu.printCompositeOperations(compositeOperations)
+      val opt = scala.io.StdIn.readInt()
+
+      if(opt > compositeOperations.size){
+        throw new Error("Create operation index out of bounds.")
+      } else {
+        if(opt == 0) {
+          println("Name operation: ")
+          (scala.io.StdIn.readLine(), ops)
+        }
+        else
+          createCompositeOperation(ops ::: compositeOperations(opt-1)._2)
+      }
+    }
+
+    def chooseCompositeOperation(l : Level, composits : List[(String, List[Level => Level])]) : Level = {
+      Menu.printCompositeOperations(composits)
+      val opt = scala.io.StdIn.readInt()
+      opt match {
+        case 0 => l
+        case _ => executeCompositeOperation(l, composits(opt-1)._2)
+      }
+    }
+
+    def executeCompositeOperation(level: Level, composit : List[Level => Level]) : Level = {
+      composit match {
+        case Nil => level
+        case f :: xs => executeCompositeOperation(f(level), xs)
+      }
+    }
+
+    def filterWeakTiles(level : Level) : Level = {
+      val (x,y)  = readCoordinate()
+      println("Input distance for filter: ")
+      val n = scala.io.StdIn.readInt()
+
+      val fieldsToUpdate = List(
+        try { Some(level.getFieldAtCoordinate(x, y+n)) } catch {case _ : IndexOutOfBoundsException => None},
+        try { Some(level.getFieldAtCoordinate(x, y-n)) } catch {case _ : IndexOutOfBoundsException => None},
+        try { Some(level.getFieldAtCoordinate(x+n, y)) } catch {case _ : IndexOutOfBoundsException => None},
+        try { Some(level.getFieldAtCoordinate(x-n, y)) } catch {case _ : IndexOutOfBoundsException => None}
+      )
+      level.transformBoardAtFields(fieldsToUpdate.flatten, (f : Field) => if(f == WeakTile(0)) Tile(0) else f)
     }
 
     var opt = 0
     var newLevel : Level = level
     do{
+      println(newLevel)
       Menu.printEditMenu()
       try {
         opt = scala.io.StdIn.readInt()
         opt match {
-          case 1 => newLevel = level.transformBoardAtField(level.getFieldAtCoordinate(readCoordinate()), _ => NoTile(0))
-          case 2 => newLevel = level.transformBoardAtField(level.getFieldAtCoordinate(readCoordinate()), _ => Tile(0))
-          case 3 => newLevel = level.transformBoardAtField(level.getFieldAtCoordinate(readCoordinate()), convertTileToWeakTile)
-          case 4 => newLevel = level.transformBoardAtField(level.getFieldAtCoordinate(readCoordinate()), convertWeakTileToTile)
-          case 5 => newLevel = setStartingPosition(level, level.getFieldAtCoordinate(readCoordinate()))
-          case 6 => newLevel = setEndPosition(level, level.getFieldAtCoordinate(readCoordinate()))
+          case 1 => newLevel = newLevel.transformBoardAtField(newLevel.getFieldAtCoordinate(readCoordinate()), _ => NoTile(0))
+          case 2 => newLevel = newLevel.transformBoardAtField(newLevel.getFieldAtCoordinate(readCoordinate()), _ => Tile(0))
+          case 3 => newLevel = newLevel.transformBoardAtField(newLevel.getFieldAtCoordinate(readCoordinate()), convertTileToWeakTile)
+          case 4 => newLevel = newLevel.transformBoardAtField(newLevel.getFieldAtCoordinate(readCoordinate()), convertWeakTileToTile)
+          case 5 => newLevel = setStartingPosition(newLevel, newLevel.getFieldAtCoordinate(readCoordinate()))
+          case 6 => newLevel = setEndPosition(newLevel, newLevel.getFieldAtCoordinate(readCoordinate()))
+          case 7 => compositeOperations = compositeOperations :+ createCompositeOperation(List())
+          case 8 => newLevel = chooseCompositeOperation(newLevel, compositeOperations)
+          case 9 => newLevel = filterWeakTiles(newLevel)
+          case 0 =>
+            if(newLevel == level){
+              None
+            } else Some(newLevel)
+          case _ => println("Invalid menu choice.")
         }
       } catch {
         case _ : NumberFormatException => println("Invalid menu choice.")
@@ -284,9 +358,5 @@ object LevelEditor {
         case e : Error => println(e.toString)
       }
     } while (opt != 0)
-    if(newLevel == level){
-      None
-    } else Some(newLevel)
   }
-
 }

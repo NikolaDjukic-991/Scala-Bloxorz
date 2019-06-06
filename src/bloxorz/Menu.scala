@@ -17,6 +17,7 @@ object Menu {
       println("2. Play level")
       println("3. Execute moves from file")
       println("4. Solve level")
+      println("5. Edit level")
       println("")
       println("Choice: ")
 
@@ -76,8 +77,13 @@ object Menu {
             case 5 =>
               LevelCollection.printLevelChooseMenu()
               val lvlChoice = scala.io.StdIn.readLine().toInt
-              if(lvlChoice != 0)
-                LevelEditor.edit(LevelCollection.chooseLevel(lvlChoice))
+              if(lvlChoice != 0) {
+                val lvlOpt = LevelEditor.edit(LevelCollection.chooseLevel(lvlChoice))
+                if(lvlOpt.isDefined){
+                  LevelCollection.levels = LevelCollection.levels :+ lvlOpt.get
+                }
+              }
+
 
 
             case 0 =>
@@ -107,8 +113,26 @@ object Menu {
     println("4. Replace weak tile with plain tile at coordinate")
     println("5. Set starting position at coordinate")
     println("6. Set end position at coordinate")
+    println("7. Create composite operation")
+    println("8. Execute composite operation")
+    println("9. Apply filter")
     println("")
     println("Choice: ")
 
+  }
+
+
+  def printCompositeOperations(composits : List[(String, List[Level => Level])]) : Unit = {
+    def printInner(composits : List[(String, List[Level=>Level])], num : Int) : Unit = {
+      composits match {
+        case x :: xs =>
+          println(num + " " + x._1)
+          printInner(xs, num+1)
+        case Nil =>
+      }
+    }
+
+    printInner(composits, 1)
+    println("0. Save and exit")
   }
 }
